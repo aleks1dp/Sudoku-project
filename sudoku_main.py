@@ -94,7 +94,7 @@ class Board:
     
 
 
-    class SudokuGame:
+    class SudokuGenerator:
         CLUES = {1: 40, 2: 32, 3: 25} #number of clues for each difficulty level
 
         def generate(self, difficulty: str):
@@ -364,8 +364,103 @@ class Display:
             print("s - Show remaining numbers")
             print("q - Quit the game")
             input("\nPress 'Enter' to continue...")
+
+
+
+class SudokuGamePlay:
+    def __init__(self):
+        self.board = None
+        self.undo_redo = UndoRedo()
+        self.history = SudokuGameHistory()
+        self.display = Display()
+        self.generator = Board.SudokuGenerator()
+        self.start_time = 0.0
+        self.time_limit = None
+
+    def new_game(self, difficulty: str, time_limit: int = None):
+        self.board = self.generator.generate(difficulty) #new board based on the selected difficulty
+        self.undo_redo = UndoRedo()#clear the undo redo history 
+        self.start_time = time.time() #start the timer
+        self.time_limit = time_limit #set the time limit
+        self.game_loop() #start the game loop for player input and interaction
+
+        def game_loop(self, difficulty: str):
+            mistakes = set() #track incorrect placements to highlight them on the board
+            while True:
+                self.display.clear()
+                self.display.title()
+                elapsed = time.time() - self.start_time #calculate elapsed time
+                
+                difficulty_color = {
+                    "easy": Colors.GREEN,
+                    "medium": Colors.YELLOW,
+                    "hard": Colors.RED,
+                    "timed": Colors.MAGENTA
+                }.get(difficulty, Colors.WHITE) 
+
+                print(
+                f" Difficulty: {difficulty_color}{difficulty.upper()}{Colors.RESET}  "
+                f"|  Undo: "{Colors.GREEN if self.move_stack.can_undo() else Colors.DIM}"
+                f"{'YES' if self.move_stack.can_undo() else 'no'}{Colors.RESET}  "
+                f"|  Redo: "{Colors.GREEN if self.move_stack.can_redo() else Colors.DIM}"
+                f"{'YES' if self.move_stack.can_redo() else 'no'}{Colors.RESET}\n"
+                )
+
+                self.display.board(self.board, mistakes = mistakes, elapsed=elapsed, time_limit=self.time_limit) #display the board with the timer and time limit if in timed mode
+                self.display.rem_numbers(self.board) #show how many of each number have been placed and how many are remaining
+
+            
+                if self.time_limit and elapsed >= self.time_limit: #check if time limit has been reached
+                    print(f"{Colors.RED}{Colors.BOLD}Time's up! Game over.{Colors.RESET}\n")
+                    self.save_history(difficulty, completed = False, elapsed=elapsed) #save the game history even if they didn't finish for replaying later
+                    input("Press 'Enter' to return to the main menu...")
+                    return #return to main menu after time's up
+
+                if self.board.complete(): #check if the board is complete after each move
+                    elapsed = time.time() - self.start_time #final elapsed time
+                    self.display.clear()
+                    self.display.title()
+                    self.display.board(self.board)
+                    mins, secs = divmod(elapsed, 60)
+                    print(f"{Colors.GREEN}{Colors.BOLD}Congratulations! You solved the puzzle in {mins:02d} minutes and {secs:02d} seconds!{Colors.RESET}\n")
+                    self.save_history(difficulty, completed=True, elapsed=elapsed) #save the game history
+                    input("Press 'Enter' to return to the main menu...")
+                    return
+
+                # Player input handling
+                print("Enter your move (row col num), or 'u' to undo, 'r' to redo, 'h' for hint, 's' for remaining numbers, 'q' to quit")
+
+                try:
+                    raw_input = input().strip().lower() #get player input and normalize it
+                except:
+                    raw_input = "q" #if input fails, treated as a quit command to avoid crashing
+                
+                if raw_input == 'q': #quit the game
+                    self.save_history(difficulty, completed=False, elapsed=time.time()-self.start_time) #save the game history
+                    print(f"{Colors.YELLOW}Game saved. Returning to main menu...{Colors.RESET}\n")
+                    time.sleep(1)
+                    return
+                
+                if raw_input == 'u': #undo the last move
+                    self.undo_move(mistakes)
+                    continue
+
+                if raw_input == 'r': #redo the last undone move
+                    self.redo_move(mistakes)
+                    continue    
+
+                if raw_input == 'h': #provide a hint by filling in one of the empty cells with the correct value from the solution
+                    self.hint(mistakes)
+                    continue
+
+                if raw_input == 's': #show how many of each number have been placed and how many are remaining
+                    input("Press 'Enter' to continue...")
+                    continue 
+
+            
+            #Verifying inputs
         
-        
+
 
 
 
