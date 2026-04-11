@@ -244,3 +244,76 @@ class SudokuGameHistory:
             except (json.JSONDecodeError, IOError):
                 return [] #if the file is corrupted or cannot be read, return empty list
         return [] #no history file found, return empty list
+    
+    def save(self, session: dict):
+        self.sessions.append(session) #add the new session to the list of sessions
+        try:
+            with open(HISTORY_FILE, "w") as f:
+                json.dump(self.sessions, f, indent=4) #save the updated sessions list to the file 
+        except (json.JSONDecodeError, IOError):
+            pass #if the file cannot be written to, ignore the error
+    
+    def list_sessions(self)->list:
+        return self.sessions #return the list of saved sessions for replaying past games
+    
+    def get_session(self, index: int) -> dict:
+        if 0 <= index < len(self.sessions):
+            return self.sessions[index] #return the session at the specified index if it exists
+        return None #invalid index -- out of bound --  return None
+    
+
+class Display:
+    @staticmethod
+    def clear():
+        os.system('cls' if os.name == 'nt' else 'clear') #clear between moves for better readability
+
+    @staticmethod
+    def title():
+        print(f"""{Colors.BOLD}{Colors.BLUE}Welcome to Sudoku!{Colors.RESET}\n{Colors.DIM}  Classic 9x9  |  Undo/Redo  |  Replay  |  Timed Mode{Colors.RESET}""") 
+    
+    @staticmethod
+    def board(board, highlight=None, mistakes = None, elapsed = None, time_limit = None):
+
+        #timer on top right of the board
+        if elapsed is not None:
+            mins, secs = divmod(elapsed, 60)
+            timer = f"Timer: {int(mins):02d}:{int(secs):02d}"
+
+            if time_limit is not None:
+                remaining_time = max(0, time_limit - elapsed)
+                mins_remain, secs_remain = divmod(remaining_time, 60)
+                timer += f" | Remaining: {int(mins_remain):02d}:{int(secs_remain):02d}"
+            print(f"{Colors.BOLD}{Colors.YELLOW}{timer}{Colors.RESET}\n")
+
+            size = board.size
+
+        #Column headers
+        print(f"\n{Colors.DIM}    1 2 3 | 4 5 6 | 7 8 9{Colors.RESET}")
+        print(f"{Colors.DIM}   ───────────────────────{Colors.RESET}")
+
+        #Rows of the board
+        for row in range(size):
+            if row > 0 and row % board.base == 0:
+                print(f"{Colors.DIM}   ───────────────────────{Colors.RESET}")
+            row_str = f"{Colors.DIM} {row + 1} │{Colors.RESET}"
+            for col in range(size):
+                cell_value = board.get_cell(row, col)
+                cell_str = f"{cell_value}" if cell_value != 0 else " " #empty cells are shown as blank spaces
+                if highlight and (row, col) in highlight:
+                    colors = colors.YELLOW + colors.BOLD #highlight hinted cells in yellow
+                elif mistakes and (row, col) in mistakes:
+                    colors = colors.RED + colors.BOLD #highlight incorrect cells in red
+                elif board.is_cell_fixed(row, col):
+                    colors = colors.WHITE + colors.BOLD #clues are highlighted in white
+                elif cell_value != 0:
+                    colors = colors.BLUE + colors.BOLD #player's correct inputs are highlighted in blue
+                else:
+                    colors = colors.DIM #empty cells are dimmed to differentiate them from filled cells
+                row_str += f" {colors}{cell_str}{Colors.RESET}"
+                if col in [2, 5]: #vertical separators for 3x3 boxes
+                    row_str += f" {Colors.DIM}|{Colors.RESET}"
+                else:
+                    row_str += " " #regular space between cells
+            print(row_str)
+        
+        print(f"\n{Colors.DIM}   ───────────────────────{Colors.RESET}")
