@@ -317,3 +317,55 @@ class Display:
             print(row_str)
         
         print(f"\n{Colors.DIM}   ───────────────────────{Colors.RESET}")
+
+        @staticmethod
+        def rem_numbers(board: Board):
+            remaining = board.remaining_cells() #get the count of how many of each number has been placed on the board
+            print(f"\n{Colors.MAGENTA}{Colors.BOLD}Numbers Remaining:{Colors.RESET}")
+            for num in range(1, board.size + 1):
+                count = remaining[num] #how many have been placed
+                if count == 0:
+                   colors = Colors.GREEN + Colors.BOLD #if none have been placed, green to show it's a good number to place
+                elif count <= 3:
+                    colors = Colors.YELLOW + Colors.BOLD 
+                else:
+                    colors = Colors.WHITE + Colors.BOLD #most are still needed
+                line += f"{colors}{num}:{Colors.RESET} {count}" #show the number and how many have been placed
+            print(line +"\n")
+
+        @staticmethod
+        def menu():
+            print("\n=== MAIN MENU ===")
+            print("1. How to Play")
+            print("2. New Game")
+            print("3. Replay Previous Game")
+            print("4. View Game History")
+            print("5. Quit")
+
+        @staticmethod
+        def difficulty_menu():
+            print("\nSelect Difficulty:")
+            print("a. Easy   (40 clues)")
+            print("b. Medium (32 clues)")
+            print("c. Hard   (25 clues)")
+            print("t. Timed Mode")
+            print("x. Back")
+
+        @staticmethod
+        def how_to_play():
+            print("\n=== HOW TO PLAY ===")
+            print("Fill the 9x9 grid so each row, column, and 3x3 box")
+            print("contains the digits 1–9 exactly once.\n")
+            print("Enter moves as: row col digit  (e.g., 3 5 7)")
+            print("Clear a cell: row col 0")
+            print("u - Undo last move")
+            print("r - Redo an undone move")
+            print("h - Hint")
+            print("s - Show remaining numbers")
+            print("q - Quit the game")
+            input("\nPress 'Enter' to continue...")
+        
+        
+
+
+
