@@ -171,4 +171,76 @@ class Board:
                             if solutions >= limit: #no empty cells found, stop searching
                                 return solutions
                     return solutions #return the number of solutions found so far
+                
 
+
+class GameState:
+    __slots__ = ("row", "col", "num", "timestamp") #only allows these attributes for each GameState instance
+
+    def __init__(self, row: int, col: int, old_num: int, new_num: int):
+        self.row = row
+        self.col = col
+        self.old_num = old_num # before move (undo functionality)
+        self.new_num = new_num # after move (redo/replay fucntionality)
+        self.timestamp = time.time() #when this happened during gameplay
+
+    def to_dict(self)-> dict: #converts to dict for json serialization when saving the game state to a file
+        return {
+            "row": self.row,
+            "col": self.col,
+            "old_num": self.old_num,
+            "new_num": self.new_num,
+            "timestamp": self.timestamp
+        }
+    
+class UndoRedo:
+    def __init__(self):
+        self.undo: list  = []
+        self.redo: list = []
+
+    def push(self, state: GameState):
+        self.undo.append(state) #add the new game state to the undo stack
+        self.redo.clear() #clear the redo stack since we can only redo immediately after an undo
+    
+    def undo(self) -> GameState:
+        if not self.undo:
+            return None 
+        state = self.undo.pop() #most recent game state from the undo stack
+        self.redo.append(state) #add it to the redo stack 
+        return state 
+    
+    def redo(self) -> GameState:
+        if not self.redo:
+            return None 
+        state = self.redo.pop() #most recent game state from the redo stack
+        self.undo.append(state) #add it back to the undo stack since we are redoing it
+        return state
+    
+    def can_undo(self) -> bool: 
+        return bool(self.undo) #1+ move that cna be undone
+    
+    def can_redo(self) -> bool:
+        return bool(self.redo) #1+ move that can be redone
+    
+    def history(self) -> list:
+        return self.undo + self.redo[::-1] #combine undo and redo stacks to show full history of moves, with undo moves in order and redo moves in reverse order since they are undone moves
+    
+    def clear(self): #cleared at the stat of a new game to reset the move history
+        self.undo.clear() 
+        self.redo.clear()
+
+    
+HISTORY_FILE = "sudoku_history.json" #file to save the move history for replay functionality
+
+class SudokuGameHistory:
+    def __init__(self):
+        self.sessions: list = self.load() # load previously saved sessions if any available
+
+    def load(self) -> list:
+        if os.path.exists(HISTORY_FILE):
+            try:
+                with open(HISTORY_FILE, "r") as f:
+                    return json.load(f) #load the history from the file
+            except (json.JSONDecodeError, IOError):
+                return [] #if the file is corrupted or cannot be read, return empty list
+        return [] #no history file found, return empty list
