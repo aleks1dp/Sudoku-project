@@ -4,7 +4,8 @@ import copy #creates a copy for gameplay to retain the original solution
 import json #saves and loads game state
 import os #checks whether a save file exists
 from collections import deque #used for backtracking algorithm
-from datetime import datetime #used for timestamping save files
+from datetime import datetime
+from unicodedata import digit #used for timestamping save files
 
 class Colors:
     BOLD = '\033[1m'
@@ -458,7 +459,134 @@ class SudokuGamePlay:
                     continue 
 
             
-            #Verifying inputs
+                #Verifying inputs
+                parts = raw_input.split()
+                if len(parts) != 3: # not 3 string values separated by spaces
+                    print(f"{Colors.RED}Invalid input format. Please enter: row col num{Colors.RESET}")
+                    time.sleep(1)
+                    continue
+
+                try:
+                    row, col, num = map(int, parts) #convert input to integers
+                    row -= 1 #adjust for 0 indexing
+                    col -= 1
+
+                except ValueError:
+                    print(f"{Colors.RED}Invalid input. Row, column, and number must be integers.{Colors.RESET}")
+                    time.sleep(1)
+                    continue
+
+                if not (0 <= row < self.board.size and 0 <= col < self.board.size):
+                    print(f"{Colors.RED}Row and column must be between 1 and {self.board.size}.{Colors.RESET}")
+                    time.sleep(1)
+                    continue
+
+                old = self.board.get_cell(row, col) #store the old value of the cell for undo 
+
+                if digit != 0 and not self.board.is_valid(row, col, num): #check if the move is valid 
+                    print(f"{Colors.RED}Invalid move {num} cannot be placed at ({row + 1}, {col + 1}).{Colors.RESET}")
+                    mistakes.add((row, col)) #add to mistakes set -- red
+                    time.sleep(1)
+                    continue
+
+                mistakes.discard((row, col)) #if the move is valid, remove from mistakes
+
+                move = GameState(row, col, old, num) #create a new game state for the move
+                self.move_stack.push(move) #add the move to the undo stack
+                self.board.set_cell(row, col, num) #update the game board with the new move
+
+        def do_undo(self, state: GameState, mistakes: set):
+            move = self.undo_redo.undo() #get the most recent move from the undo stack to redo
+            if not move:
+                print(f"{Colors.DIM}No moves to undo.{Colors.RESET}")
+                time.sleep(1)
+                return
+            else:
+                self.board.set_cell(state.row, state.col, state.old_num) #revert the cell to the old value
+                if state.new_num != 0 and not self.board.is_valid(state.row, state.col, state.new_num): #if the move being undone was incorrect, add it back to the mistakes set
+                    mistakes.add((state.row, state.col))
+                else:
+                    mistakes.discard((state.row, state.col)) #if the move being undone was correct, remove it from the mistakes set if it was there
+                print(f"{Colors.GREEN}Undone: cell ({move.row+1},{move.col+1} restored to {move.old_val if move.old_val else 'empty'}{Colors.RESET}")
+                time.sleep(1)
+
+        def do_redo(self, state: GameState, mistakes: set):
+            move = self.undo_redo.redo() #get the most recent undone move from the redo stack to undo
+            if not move:
+                print(f"{Colors.DIM}No moves to redo.{Colors.RESET}")
+                time.sleep(1)
+                return
+            else:
+                self.board.set_cell(state.row, state.col, state.new_num) #reapply the move by setting the cell to the new value
+                if state.new_num != 0 and not self.board.is_valid(state.row, state.col, state.new_num): #if the move being redone is incorrect, add it back to the mistakes set
+                    mistakes.add((state.row, state.col))
+                else:
+                    mistakes.discard((state.row, state.col)) #if the move being redone is correct, remove it from the mistakes set if it was there
+                print(f"{Colors.GREEN}Redone: cell ({move.row+1},{move.col+1} set to {move.new_val if move.new_val else 'empty'}{Colors.RESET}")
+                time.sleep(1)
+
+        def hint(self):
+            empty_cells = [(r, c) for r in range(self.board.size) for c in range(self.board.size) if self.board.get_cell(r, c) == 0] #list of all empty cells
+            if not empty_cells:
+                print(f"{Colors.DIM}No empty cells to provide a hint for.{Colors.RESET}")
+                time.sleep(1)
+                return
+            row, col = random.choice(empty_cells) #randomly select an empty cell to provide a hint for
+            correct_num = self.board.solution[row][col] #get the correct sol
+
+            self.undo_redo.push(GameState(row, col, 0, correct_num)) #record the hint as a move
+            self.board.set_cell(row, col, correct_num) #fill in the cell with the correct number from the solution
+            print(f"{Colors.GREEN}Hint: cell ({row+1},{col+1}) set to {correct_num}{Colors.RESET}")
+            time.sleep(1)
+
+        def save_history(self, difficulty: str, completed: bool, elapsed: float):
+            session = {
+                "timestamp": datetime.now().isoformat(), #when the game was played
+                "difficulty": difficulty,
+                "completed": completed,
+                "elapsed": round(elapsed, 2), #round to 2 decimal places for readability
+                "solution": self.board.solution, #save the solution for replaying later
+                "initial_board": self.board.copy_grid(), #save the initial board state for replaying later
+                "fixed_cells": [row[:] for row in self.board.fixed_cells], #save which cells were fixed for replaying later
+                "moves": [state.to_dict() for state in self.undo_redo.history()] #convert the move history to a list of dicts for json serialization
+            }
+            self.history.save(session) #save the session to the history file for replaying later
+
+        def replay_game(self, session: dict):
+            self.board = Board() #create a new blank board to replay the game on
+            self.board.grid = copy.deepcopy(session["initial_board"]) #set the board to the initial state of the game
+            self.board.fixed = copy.deepcopy(session["fixed_cells"]) #set which cells are fixed for the replay
+            self.board.solution = copy.deepcopy(session["solution"]) #set the solution for the replay
+            moves = session["moves"] #list of move dicts to replay in order
+            tot = len(moves)
+            start=time.time() #start the timer for the replay
+
+            
+            #print(f"{Colors.BOLD}{Colors.CYAN}Replaying Game from {session['timestamp']} - Difficulty: {session['difficulty'].upper()}{Colors.RESET}\n")
+            
+            for i, move_dict in enumerate(moves, start=1):
+                time.sleep(1) 
+                self.board.set_cell(move_dict['row'], move_dict['col'], move_dict['new_num']) #apply each move to the board
+                self.display.clear()
+                self.display.title()
+                print(f"{Colors.BOLD}{Colors.CYAN}Replaying Game from {session['timestamp']} - Difficulty: {session['difficulty'].upper()}{Colors.RESET}\n")
+                print(f"Move {i} of {len(moves)}\n")
+                self.display.board(self.board) #display the board after each move is applied
+            
+            self.display.clear()
+            self.display.title()
+            self.display.board(self.board) #display the initial state of the board before replaying moves
+            input("Replay complete! Press 'Enter' to return to the main menu...")
+
+            
+
+
+
+
+
+
+
+
         
 
 
