@@ -3,7 +3,6 @@ import time #timer function of the game
 import copy #creates a copy for gameplay to retain the original solution
 import json #saves and loads game state
 import os #checks whether a save file exists
-from collections import deque #used for backtracking algorithm
 from datetime import datetime
 
 
@@ -641,7 +640,6 @@ class SudokuGamePlay:
                 input("Press 'Enter' to continue...")
                 continue 
 
-        
             #verifying inputs
             parts = raw_input.split()
             if len(parts) != 3: # not 3 string values separated by spaces as instructed
@@ -697,11 +695,8 @@ class SudokuGamePlay:
             time.sleep(1)
             return
         else:
-            self.board.set_cell(move.row, move.col, move.old_num) #revert the cell to the old value
-            if move.new_num != 0 and not self.board.is_valid(move.row, move.col, move.new_num): #if the move being undone was incorrect, add it back to the mistakes set
-                mistakes.add((move.row, move.col))
-            else:
-                mistakes.discard((move.row, move.col)) #if the move being undone was correct, remove it from the mistakes set if it was there
+            self.board.set_cell(move.row, move.col, move.old_num) #revert by setting the cell back to the old value
+            mistakes.discard((move.row, move.col)) #discard regardless since we are undoing
             print(f"{Colors.GREEN}Undone: cell ({move.row+1},{move.col+1}) restored to {move.old_num if move.old_num else 'empty'}{Colors.RESET}")
             time.sleep(1)
 
@@ -755,6 +750,7 @@ class SudokuGamePlay:
             "solution": self.board.solution, #save the solution for replaying later
             "initial_board": self.initial_board, #save the initial board state for replaying later
             "fixed_cells": [row[:] for row in self.board.fixed], #save which cells were fixed for replaying later
+            "current_grid": self.board.copy_grid(), #save the current grid state for resuming later
             "moves": [state.to_dict() for state in self.undo_redo.history()] #convert the move history to a list of dicts for json 
         }
         self.history.save(session) #save the session to the history file for replaying later
@@ -789,6 +785,20 @@ class SudokuGamePlay:
         self.board.fixed = copy.deepcopy(session["fixed_cells"])
         self.board.solution = copy.deepcopy(session["solution"])
         self.initial_board = self.board.copy_grid()
+        self.undo_redo = UndoRedo()
+        self.freebie_used = False
+        self.mistake_count = 0
+        self.start_time = time.time()
+        self.time_limit = None
+        difficulty = session.get("difficulty", "medium")
+        self.game_loop(difficulty)
+
+    def resume_game(self, session: dict):
+        self.board = Board()
+        self.board.grid = copy.deepcopy(session["current_grid"])  #picks up where you left off
+        self.board.fixed = copy.deepcopy(session["fixed_cells"])
+        self.board.solution = copy.deepcopy(session["solution"])
+        self.initial_board = copy.deepcopy(session["initial_board"])
         self.undo_redo = UndoRedo()
         self.freebie_used = False
         self.mistake_count = 0
@@ -905,6 +915,8 @@ class Controller:
                         self.gameplay.replay_game(session)
                     elif mode == '2':
                         self.gameplay.replay_as_new_game(session)
+                    elif mode == '3':
+                        self.gameplay.resume_game(session) 
                     else: #invalid choice for replay mode, return to replay menu
                         print(f"{Colors.RED}Invalid choice.{Colors.RESET}")
                         time.sleep(1)
