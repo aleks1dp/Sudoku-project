@@ -3,7 +3,7 @@ Command-Line Sudoku Game
 
 Files Included:
 sudoku_main.py
-README.md
+README.txt
 sudoku_history.json (generated  when the game is played)
 
 Requirements:
