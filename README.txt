@@ -42,11 +42,11 @@ Game Rules:
   - You are allowed a maximum of 3 mistakes before the game ends.
 
 Controls During Gameplay:
-- row col num: Place a number (e.g. "3 5 7" places 7 at row 3, column 5)
-- row col 0: Clear a cell (e.g. "3 5 0")
+- row col num: Place a number (eg "3 5 7" places 7 at row 3, col 5)
+- row col 0: Clear a cell (eg "3 5 0")
 - u: Undo the last move
 - r: Redo a previously undone move
-- h: Request a hint (first hint is free; after that you must solve a mini 4x4 Sudoku puzzle to earn it)
+- h: Request a hint (first hint is free but after that you must solve a mini 4x4 Sudoku puzzle to earn it)
 - q: Quit and save the current game to history
 
 Save and Replay Functionality: 
