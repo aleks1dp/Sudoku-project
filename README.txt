@@ -22,16 +22,18 @@ NOTE: The below features will also be displayed during gameplay, so beyond this 
 running the game should be sufficient.
 
 Game Features:
-- Easy, Medium, and Hard difficulty levels
-- Timed mode
-- Undo and Redo functionality
-- Hint system
-  - Mini Sudoku challenge to unlock extra hints after the use of the first free hint
--Move history saving
-  -Replay previous games
-  - Resume incomplete games
--Mistake counter
-- Colored command-line interface
+1.  Easy, Medium, and Hard difficulty levels
+  a. Timed mode
+2.  Undo and Redo functionality
+3.  Hint system (first hint free)
+  a. Mini 4×4 Sudoku challenge to unlock extra hints
+4.  Move history saving
+  a. Replay previous games (auto-playback)
+  b. Replay same starting board as a new game
+  c. Resume incomplete games
+5. Mistake counter (max 3 before game over)
+6. Digit placement tracker
+7. Color-coded terminal interface
 
 Game Rules: 
 - Fill the 9x9 grid so that every row, column, and 3x3 box contains the digits 1 to 9 once.

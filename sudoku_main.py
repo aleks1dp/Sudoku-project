@@ -114,7 +114,7 @@ class SudokuGenerator:
                     numbers = list(range(1, Board.size + 1)) #1-9 numbers to try placing in the cell
                     random.shuffle(numbers) #randomize the 1-9 numbers
                     for num in numbers:
-                        if self.isValid(self.board.grid, row, col, num): #checks if placing the number is valid 
+                        if self.isValid(grid, row, col, num): #checks if placing the number is valid 
                             grid[row][col] = num #places the number in the cell
                             if self.fill(grid): #recur until the board is completely filled
                                 return True
@@ -291,17 +291,44 @@ class MiniSudokuGenerator:
         return True
     
     def removeCells(self, board):
-        # total cells 16, keep 6
-        cells_to_remove = MiniBoard.size * MiniBoard.size - self.CLUES #numeber of cells to remove to leave  6 clues
-        cells = [(r, c) for r in range(MiniBoard.size) for c in range(MiniBoard.size)] #all cell coordinates
-        random.shuffle(cells) #randomzie the removal order
+        clues = self.CLUES
+        cells_to_remove = MiniBoard.size * MiniBoard.size - clues #remove based on difficulty
+        cells = [(r, c) for r in range(MiniBoard.size) for c in range(MiniBoard.size)] #list of all cell coordinates
+        random.shuffle(cells) #randomize the order of the cells to remove
         removed = 0
 
-        for row, col in cells: #iterate until we've removed enough cells
-            if removed >= cells_to_remove:
+        for row, col in cells:
+            if removed >= cells_to_remove: #no need to continue if we've removed enough cells
                 break
-            board.grid[row][col] = 0 #clear the cell 
-            removed += 1 # increment the count of removed cells
+            fail_safe = board.grid[row][col] #store the original value of the cell to restore it if removing it leads to multiple solutions
+            board.grid[row][col] = 0 #clear the cell to create a clue
+
+            test_grid = copy.deepcopy(board.grid) #create a copy of the board to test if it still has a solution after removing the cell
+            count = [0]
+            self.countSolutions(test_grid, count) #count the number of solutions for the test board
+            count = count[0]
+            if count != 1: #if the test board does not have a unique solution
+                board.grid[row][col] = fail_safe #restore the original value
+            else:
+                removed += 1 #keep the removal as the sol is unique and increment the count of removed cells
+
+    def countSolutions(self, grid, count, limit=2): #2 or more solutions = not unique
+        if count[0] >= limit:
+            return
+
+        for row in range(MiniBoard.size):
+            for col in range(MiniBoard.size):
+                if grid[row][col] == 0: #empty cell
+                    for num in range(1, MiniBoard.size + 1): # go from 1-4 to try placing in the empty cell
+                        if self.isValid(grid, row, col, num): #check if placing the number is valid
+                            grid[row][col] = num
+                            self.countSolutions(grid, count, limit) #recur to count solutions for the remaining cells
+                            grid[row][col] = 0 #backtrack
+                            if count[0] >= limit: #stop early if we've found enough solutions
+                                return
+                    return #return the number of solutions found so far
+        count[0] += 1
+
 
 class GameState:
     __slots__ = ("row", "col", "old_num", "new_num", "timestamp") #only allows these attributes for each GameState instance
@@ -452,12 +479,12 @@ class Display:
     @staticmethod #allows to call an instance of Display without needing to create an object since this function is only used for displaying the remaining numbers and doesn't rely on any instance variables
     def remNumbers(board: Board):
         remaining = board.remainingCells() #get the count of how many of each number has been placed on the board
-        print(f"\n{Colors.MAGENTA}{Colors.BOLD}Numbers Remaining:{Colors.RESET}")
+        print(f"\n{Colors.MAGENTA}{Colors.BOLD}Numbers Placed:{Colors.RESET}")
         line = "" #initialise line before the loop
         for num in range(1, board.size+ 1):
             count = remaining[num] #how many have been placed
-            if count == 0:
-                cell_color = Colors.GREEN + Colors.BOLD #none are placed, so all are remaining
+            if count == board.size:  # all 9 placed
+                cell_color = Colors.GREEN + Colors.BOLD
             elif count <= 3:
                 cell_color = Colors.YELLOW + Colors.BOLD #few are placed, so it's a good number to place
             else:
@@ -500,22 +527,35 @@ class Display:
 # Mini game
 def display_mini(board):
     print("\nSolve this mini Sudoku to earn your hint!\n")
-    for r in range(4): #iterate through the 4 rows of the mini board
-        row = "" #initialise row string before the loop
-        for c in range(4):
-            val = board.grid[r][c]
-            row += f"{val if val != 0 else ' '} " #show the value of the cell or a blank space if it's empty
-            if c == 1:
-                row += "| " #vertical separator for the boxes
-        print(row)
-        if r == 1:
-            print("────┼────") #separators for the boxes
+    print(f"{Colors.DIM}     1  2 | 3  4{Colors.RESET}")
+    print(f"{Colors.DIM}   ─────────────{Colors.RESET}")
+    for row in range(board.size):
+        if row > 0 and row % board.base == 0:
+            print(f"{Colors.DIM}   ─────────────{Colors.RESET}")
+        row_str = f"{Colors.DIM} {row + 1} │{Colors.RESET}"
+        for col in range(board.size):
+            cell_value = board.getCell(row, col)
+            cell_str = f"{cell_value}" if cell_value != 0 else " " #empty cells are shown as blank spaces
+            if board.is_cell_fixed(row, col):
+                cell_color = Colors.WHITE + Colors.BOLD #clues are highlighted in white
+            elif cell_value != 0:
+                cell_color = Colors.BLUE + Colors.BOLD #correct inputs are highlighted in blue
+            else:
+                cell_color = Colors.DIM #empty cells are dimmed to differentiate them from filled cells
+            row_str += f" {cell_color}{cell_str}{Colors.RESET}" #color the cell value based on its status 
+            if col in [1]: #vertical separators for boxes
+                row_str += f" {Colors.DIM}|{Colors.RESET}"
+            else:
+                row_str += " " #regular space between cells
+        print(row_str)
+    print(f"\n{Colors.DIM}   ─────────────{Colors.RESET}")
 
 def play_mini_game():
     gen = MiniSudokuGenerator() #new generator for mini sudoku
     board = gen.generate()
 
     while True:
+        Display.clear()
         display_mini(board)
 
         if board.complete():
@@ -802,7 +842,7 @@ class SudokuGamePlay:
         self.undoRedo = UndoRedo()
         self.freebieUsed = False
         self.mistakeCount = 0
-        self.startTime = time.time()
+        self.startTime = time.time() - session.get("elapsed", 0)
         self.timeLimit = None
         difficulty = session.get("difficulty", "medium")
         self.gameLoop(difficulty)
@@ -866,7 +906,7 @@ class Controller:
                 except ValueError:
                     print(f"{Colors.RED}Invalid time limit. Please enter a number.{Colors.RESET}")
                     time.sleep(1)
-            elif choice == 'x': #go back to main menu
+            elif choice == 'q': #go back to main menu
                 return
             else:
                 print(f"{Colors.RED}Invalid choice. Please try again.{Colors.RESET}")
@@ -899,8 +939,8 @@ class Controller:
                 mins = int(elapsed) // 60
                 secs = int(elapsed) % 60
                 print(f"{i}. {timestamp} - Difficulty: {difficulty.upper()} - {completed} - Time: {mins:02d}:{secs:02d}")
-            choice = input(f"\n{Colors.DIM}{Colors.MAGENTA}Enter the number of the game to replay or 'x' to return to the main menu: {Colors.RESET}").strip().lower()
-            if choice == 'x': # go back to menu
+            choice = input(f"\n{Colors.DIM}{Colors.MAGENTA}Enter the number of the game to replay or 'q' to return to the main menu: {Colors.RESET}").strip().lower()
+            if choice == 'q': # go back to menu
                 return
             
             try: #validate the input and replay the selected game session
@@ -926,7 +966,7 @@ class Controller:
                     print(f"{Colors.RED}Invalid choice. Please enter a number between 1 and 3.{Colors.RESET}")
                     time.sleep(1)
             except ValueError: #cannot be converted to an integer, prompt again
-                print(f"{Colors.RED}Invalid input. Please enter a number or 'x'.{Colors.RESET}")
+                print(f"{Colors.RED}Invalid input. Please enter a number or 'q'.{Colors.RESET}")
                 time.sleep(1)
     
     def history_menu(self):
